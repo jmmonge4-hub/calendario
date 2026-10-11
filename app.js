@@ -311,7 +311,9 @@ function render() {
         const b = document.createElement("span");
         b.className = "shift" + (c.light ? " light" : "") + (ext.includes(id) ? " ext" : "");
         b.style.background = c.color;
-        b.innerHTML = `<b>${c.code}</b><span class="lbl">${c.name}</span>`;
+        // El festivo solo pinta el color, sin letras
+        b.innerHTML = id === "festivo" ? "" : `<b>${c.code}</b><span class="lbl">${c.name}</span>`;
+        if (id === "festivo") b.title = c.name;
         if (ext.includes(id)) b.title = c.name + " (de la planificación)";
         box.append(b);
       }
