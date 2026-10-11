@@ -81,9 +81,19 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   overflow: hidden; overflow-wrap: break-word; hyphens: auto;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
 }
+/* Nota dentro de un día pintado: texto en el propio color, sin pósit */
+.shift.with-note { flex-direction: column; justify-content: flex-start; gap: 0; padding: 15px 2px 2px; white-space: normal; }
+.shift.with-note > b, .shift.with-note > .lbl { flex: none; line-height: 1.1; }
+.cell .note.in {
+  flex: 1 1 auto; min-height: 0; width: 100%; margin: 1px 0 0; padding: 0; background: none; box-shadow: none; border-radius: 0;
+  color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.35); text-align: center; font-weight: 600; display: block; -webkit-line-clamp: unset;
+}
+.cell .note.in.light { color: #1f2328; text-shadow: none; }
+.shifts:has(.with-note) .shift:not(:last-child) { flex: 0 1 auto; }
+.shifts:has(.with-note) .shift:not(:last-child) { padding: 2px 3px; }
 @media (max-width: 600px) { .shift .lbl { display: none; } }
 @media (max-width: 380px) { .cell .note { font-size: .64rem; -webkit-line-clamp: 3; } }
-@media (min-width: 700px) { .cell .num { top: 5px; left: 5px; } .cell .num { font-size: .95rem; } .shift { font-size: .85rem; } .cell .note { font-size: .82rem; margin: auto 3px 3px; padding: 3px 6px; -webkit-line-clamp: 2; } }
+@media (min-width: 700px) { .cell .num { top: 5px; left: 5px; } .cell .num { font-size: .95rem; } .shift { font-size: .85rem; } .cell .note { font-size: .82rem; margin: auto 3px 3px; padding: 3px 6px; -webkit-line-clamp: 2; } .cell .note.in { margin: 2px 0 0; padding: 0 4px; -webkit-line-clamp: unset; } .shift.with-note { padding-top: 22px; } }
 body.painting .cell:hover { outline: 2px dashed var(--accent); outline-offset: -2px; }
 
 /* Barra inferior */

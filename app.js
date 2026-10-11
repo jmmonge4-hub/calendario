@@ -323,7 +323,13 @@ function render() {
       const n = document.createElement("span");
       n.className = "note"; n.textContent = info.n;
       el.classList.add("has-note");
-      el.append(n);
+      if (list.length) {
+        // Día pintado: la nota va dentro del color, debajo del turno (como en Shifter)
+        const last = CAT[list[list.length - 1]], band = el.querySelector(".shift:last-child");
+        n.classList.add("in"); if (last.light) n.classList.add("light");
+        band.classList.add("with-note");
+        band.append(n);
+      } else el.append(n);
     }
     el.title = [...list.map(id => CAT[id].name), info.n].filter(Boolean).join(" · ");
     grid.append(el);
