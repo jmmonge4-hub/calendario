@@ -67,10 +67,16 @@ async function initFirebase() {
           else await au.signInWithPopup(auth, new au.GoogleAuthProvider());
         });
     }
-    // Sube lo que hubiera guardado en local antes de conectar
-    const byMonth = {};
-    for (const [k, v] of Object.entries(days)) (byMonth[k.slice(0, 7)] ||= {})[k] = v;
-    for (const mk of Object.keys(byMonth)) pendingMonths.add(mk);
+    // Junta lo guardado en local con lo de la nube (por día; gana lo local) y sube solo lo que falte
+    const localMonths = new Set(Object.keys(days).map(k => k.slice(0, 7)));
+    for (const mk of localMonths) {
+      const snap = await fs.getDoc(fs.doc(db, cfg.dataCollection || "calendario_personal", mk));
+      const remote = snap.exists() ? (snap.data().days || {}) : {};
+      const differs = Object.keys(days).some(k => k.startsWith(mk) && JSON.stringify(days[k]) !== JSON.stringify(remote[k]));
+      for (const [k, v] of Object.entries(remote)) if (!(k in days)) days[k] = v;
+      if (differs) pendingMonths.add(mk);
+    }
+    saveLocal(); render();
     flush();
     setSync("Sincronizado");
     watchMonth();
@@ -122,7 +128,7 @@ function extFor(y, m, d) {
   if (!planif) return [];
   const k = `${y}-${m}`, out = [];
   if (hasDay(planif.g?.[k], d)) out.push("guardia");
-  if (hasDay(planif.p?.[k], d)) out.push("baja");
+  if (hasDay(planif.p?.[k], d)) out.push("vacaciones"); // los permisos se muestran como vacaciones
   if (hasDay(planif.f?.[k], d)) out.push("festivo");
   return out;
 }
