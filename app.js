@@ -8,7 +8,6 @@ const CATEGORIES = [
   { id: "ocio", code: "OC",    name: "Ocio",  color: "#bf8700" },
   { id: "curso", code: "CU",      name: "Curso/Formación",  color: "#8250df" },
   { id: "festivo", code: "F",    name: "Festivo",          color: "#f2cc60", light: true },
-  { id: "baja", code: "P",       name: "Baja/Permiso",     color: "#6e7781" },
   { id: "otro", code: "O",       name: "Otro",             color: "#57606a" },
 ];
 const CAT = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
@@ -190,7 +189,7 @@ const shifts = info => Array.isArray(info.c) ? info.c : info.c ? [info.c] : [];
 
 // Guarda un día y lo sincroniza
 function saveDay(key, cur) {
-  if (cur.c?.length || cur.n) days[key] = cur; else delete days[key];
+  if (cur.c?.length || cur.n || cur.h?.length) days[key] = cur; else delete days[key];
   saveLocal();
   pendingMonths.add(key.slice(0, 7));
   flush();
@@ -198,10 +197,19 @@ function saveDay(key, cur) {
 }
 
 // Modo pintar: cada toque pone o quita el turno elegido (hasta 3 por día)
+// Lo de la planificación que se ve en un día (menos lo que hayas borrado a mano, en "h")
+const keyParts = key => { const [y, m, d] = key.split("-").map(Number); return [y, m - 1, d]; };
+const visibleExt = key => extFor(...keyParts(key)).filter(id => !(days[key]?.h || []).includes(id));
+
 function applyBrush(key) {
   const cur = { ...(days[key] || {}) };
-  if (brush === BRUSH_ERASE) { delete cur.c; delete cur.n; }
-  else {
+  if (brush === BRUSH_ERASE) {
+    // La goma quita todos los colores del día (también los de la planificación); la nota se queda
+    delete cur.c;
+    const ext = extFor(...keyParts(key));
+    if (ext.length) cur.h = ext; else delete cur.h;
+  } else {
+    if (cur.h?.includes(brush)) { cur.h = cur.h.filter(x => x !== brush); if (!cur.h.length) delete cur.h; saveDay(key, cur); return; }
     let list = shifts(cur);
     if (list.includes(brush)) list = list.filter(x => x !== brush);
     else list = [...list, brush].slice(-3);
@@ -220,7 +228,7 @@ function openDay(key) {
   daySel = shifts(cur).filter(id => CAT[id]);
   $("dayTitle").textContent = fmtDay.format(new Date(y, m - 1, d));
   $("noteText").value = cur.n || "";
-  const ext = extFor(y, m - 1, d);
+  const ext = visibleExt(key);
   $("dayExt").hidden = !ext.length;
   $("dayExt").textContent = "De la planificación: " + ext.map(id => CAT[id].name).join(", ");
   renderDayCats();
@@ -245,11 +253,15 @@ const closeDay = () => { $("daySheet").hidden = true; dayKey = null; };
 $("dayForm").onsubmit = e => {
   e.preventDefault();
   const cur = {};
+  if (days[dayKey]?.h) cur.h = days[dayKey].h;
   if (daySel.length) cur.c = daySel;
   const n = $("noteText").value.trim(); if (n) cur.n = n;
   saveDay(dayKey, cur); closeDay();
 };
-$("dayClear").onclick = () => { saveDay(dayKey, {}); closeDay(); };
+$("dayClear").onclick = () => {
+  const ext = extFor(...keyParts(dayKey));
+  saveDay(dayKey, ext.length ? { h: ext } : {}); closeDay();
+};
 $("dayCancel").onclick = closeDay;
 $("daySheet").addEventListener("click", e => { if (e.target === $("daySheet")) closeDay(); });
 
@@ -276,9 +288,9 @@ function render() {
     el.dataset.key = key;
     el.innerHTML = `<span class="num">${d}</span>`;
     const mine = shifts(info).filter(id => CAT[id]);
-    const ext = extFor(year, month, d).filter(id => !mine.includes(id));
+    const ext = visibleExt(key).filter(id => !mine.includes(id));
     const list = [...ext, ...mine].slice(0, 3);
-    if (extFor(year, month, d).includes("guardia")) nGuardias++;
+    if (visibleExt(key).includes("guardia")) nGuardias++;
     if (list.length) {
       const box = document.createElement("div");
       box.className = "shifts";
@@ -315,8 +327,8 @@ function render() {
 function renderPalette() {
   const p = $("palette");
   p.innerHTML = "";
-  const items = [...CATEGORIES, { id: BRUSH_ERASE, code: "⌫", name: "Borrar" }];
-  for (const it of items) {
+  $("eraseBtn").classList.toggle("on", brush === BRUSH_ERASE);
+  for (const it of CATEGORIES) {
     const b = document.createElement("button");
     b.className = "chip" + (it.id === brush ? " on" : "");
     const bg = it.color ? `background:${it.color};color:${it.light ? "#1f2328" : "#fff"};border-color:transparent` : "";
@@ -335,6 +347,7 @@ function setPainting(on) {
 }
 $("paintBtn").onclick = () => setPainting(true);
 $("paintDone").onclick = () => setPainting(false);
+$("eraseBtn").onclick = () => { brush = BRUSH_ERASE; store.set("cal-brush", brush); renderPalette(); };
 
 // ---------- Navegación ----------
 function go(dm) {

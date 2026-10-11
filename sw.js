@@ -1,5 +1,5 @@
 // Guarda la app en caché para que abra sin conexión.
-const CACHE = "calendario-v9";
+const CACHE = "calendario-v10";
 const FILES = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-180.png"];
 
