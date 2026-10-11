@@ -1,0 +1,31 @@
+# Cada 6 horas genera calendario.ics con tus guardias, turnos y notas,
+# para que Google Calendar lo lea por suscripción.
+name: Actualizar calendario.ics
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generar calendario.ics
+        run: python3 .github/generar_ics.py
+      - name: Guardar si ha cambiado
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add calendario.ics
+          # Solo cambia la marca de hora si no hay cambios reales: no se guarda
+          if git diff --cached --quiet -I '^DTSTAMP:'; then echo "Sin cambios"; exit 0; fi
+          git commit -m "Actualizar calendario.ics"
+          git push
