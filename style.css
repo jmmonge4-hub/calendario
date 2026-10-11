@@ -137,8 +137,8 @@ body.painting .cell:hover { outline: 2px dashed var(--accent); outline-offset: -
 .sheet-box textarea { font: inherit; font-size: 16px; min-height: 84px; color: inherit; background: var(--cell); border: 1px solid var(--line); border-radius: 8px; padding: 8px; resize: vertical; }
 .sheet-actions { display: flex; gap: 8px; }
 .sheet-actions span { flex: 1; }
-/* Móvil: días algo menos alargados (alto ≈ 2,3 veces el ancho) */
+/* Móvil: días algo menos alargados (alto ≈ 1,95 veces el ancho) */
 @media (max-width: 600px) {
   .grid { flex: none; grid-auto-rows: auto; }
-  .cell { aspect-ratio: 1 / 2.3; }
+  .cell { aspect-ratio: 1 / 1.95; }
 }
