@@ -392,7 +392,22 @@ $("grid").addEventListener("touchend", e => {
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("install").hidden = false; });
 $("install").onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("install").hidden = true; };
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(console.error);
+// Actualizaciones: al volver a la app busca versión nueva y, si la hay, recarga sola
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(reg => {
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
+    setInterval(check, 30 * 60 * 1000);
+  }).catch(console.error);
+  let reloaded = false;
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    // No recargar a mitad de una nota
+    if ($("daySheet").hidden) location.reload();
+  });
+}
 
 render();
 initFirebase().then(() => { setPlanifStatus(); loadPlanif(); });
