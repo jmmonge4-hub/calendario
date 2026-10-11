@@ -266,11 +266,22 @@ $("dayCancel").onclick = closeDay;
 $("daySheet").addEventListener("click", e => { if (e.target === $("daySheet")) closeDay(); });
 
 // ---------- Dibujo ----------
-const fmtTitle = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" });
+// Mes y año son desplegables: al tocarlos se elige directamente
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+$("selMonth").innerHTML = MESES.map((n, i) => `<option value="${i}">${n}</option>`).join("");
+function fillYears() {
+  const from = Math.min(2021, year - 1), to = Math.max(now.getFullYear() + 5, year + 1);
+  const sel = $("selYear");
+  if (sel.dataset.range === `${from}-${to}`) return;
+  sel.dataset.range = `${from}-${to}`;
+  sel.innerHTML = Array.from({ length: to - from + 1 }, (_, i) => `<option>${from + i}</option>`).join("");
+}
+$("selMonth").onchange = e => { month = Number(e.target.value); go(0); };
+$("selYear").onchange = e => { year = Number(e.target.value); go(0); };
 
 function render() {
-  const t = fmtTitle.format(new Date(year, month, 1));
-  $("title").textContent = t[0].toUpperCase() + t.slice(1);
+  fillYears();
+  $("selMonth").value = month; $("selYear").value = year;
   const grid = $("grid");
   grid.innerHTML = "";
   const first = (new Date(year, month, 1).getDay() + 6) % 7; // lunes = 0

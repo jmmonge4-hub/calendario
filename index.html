@@ -16,7 +16,11 @@
   <header class="top">
     <button id="prevYear" class="nav" title="Año anterior" aria-label="Año anterior">«</button>
     <button id="prevMonth" class="nav" title="Mes anterior" aria-label="Mes anterior">‹</button>
-    <h1><span id="title"></span><i id="sync" class="sync" title=""></i></h1>
+    <h1 id="title">
+      <label class="pick"><span class="sr">Mes</span><select id="selMonth" aria-label="Mes"></select></label>
+      <label class="pick"><span class="sr">Año</span><select id="selYear" aria-label="Año"></select></label>
+      <i id="sync" class="sync" title=""></i>
+    </h1>
     <button id="nextMonth" class="nav" title="Mes siguiente" aria-label="Mes siguiente">›</button>
     <button id="nextYear" class="nav" title="Año siguiente" aria-label="Año siguiente">»</button>
     <button id="today" class="today-btn" title="Ir a hoy">Hoy</button>

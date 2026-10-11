@@ -30,7 +30,16 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Cabecera compacta */
 .top { display: flex; align-items: center; gap: 2px; padding: 6px 0; }
-.top h1 { flex: 1; margin: 0; text-align: center; font-size: 1.15rem; white-space: nowrap; }
+.top h1 { flex: 1; margin: 0; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 1.15rem; white-space: nowrap; min-width: 0; }
+.pick select {
+  font: inherit; font-weight: 700; color: var(--fg); background: transparent; border: 0; border-radius: 6px;
+  padding: 4px 16px 4px 4px; cursor: pointer; -webkit-appearance: none; appearance: none; field-sizing: content;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: right 7px center, right 3px center; background-size: 4px 4px; background-repeat: no-repeat;
+}
+.pick select:hover, .pick select:focus-visible { background-color: var(--cell); outline: none; }
+.pick option { color: var(--fg); background: var(--bg); font-weight: 400; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .top .nav { border: 0; background: transparent; min-width: 34px; font-size: 1.35rem; padding: 0 4px; color: var(--muted); }
 .top .today-btn { margin-left: 4px; font-size: .85rem; }
 .sync { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-left: 6px; vertical-align: middle; background: var(--muted); }
