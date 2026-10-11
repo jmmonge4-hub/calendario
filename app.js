@@ -376,6 +376,17 @@ $("prevMonth").onclick = () => go(-1);
 $("nextMonth").onclick = () => go(1);
 $("prevYear").onclick = () => go(-12);
 $("nextYear").onclick = () => go(12);
+// Vista "Móvil" en el ordenador: se recuerda la elección
+function setMovil(on) {
+  document.body.classList.toggle("movil", on);
+  $("modoMovil").textContent = on ? "🖥" : "📱 Móvil";
+  $("modoMovil").title = on ? "Volver a la vista de escritorio" : "Ver como en el móvil";
+  try { localStorage.setItem("vistaMovil", on ? "1" : "0"); } catch (e) {}
+}
+let vistaMovil = false;
+try { vistaMovil = localStorage.getItem("vistaMovil") === "1"; } catch (e) {}
+setMovil(vistaMovil);
+$("modoMovil").onclick = () => setMovil(!document.body.classList.contains("movil"));
 $("today").onclick = () => { year = now.getFullYear(); month = now.getMonth(); go(0); };
 $("grid").addEventListener("click", e => { const c = e.target.closest(".cell[data-key]"); if (!c) return; painting ? applyBrush(c.dataset.key) : openDay(c.dataset.key); });
 document.addEventListener("keydown", e => {

@@ -142,3 +142,20 @@ body.painting .cell:hover { outline: 2px dashed var(--accent); outline-offset: -
   .grid { flex: none; grid-auto-rows: auto; }
   .cell { aspect-ratio: 1 / 1.95; }
 }
+
+/* Botón "Móvil": solo en pantallas grandes */
+.modo-btn { display: none; }
+@media (min-width: 700px) { .modo-btn { display: inline-block; } }
+/* Vista móvil en el ordenador: misma disposición que en el teléfono */
+body.movil { max-width: 420px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+body.movil .cal { overflow-y: auto; }
+body.movil .grid { flex: none; grid-auto-rows: auto; }
+body.movil .cell { aspect-ratio: 1 / 1.95; }
+body.movil .shift .lbl { display: none; }
+body.movil .cell .num { top: 3px; left: 3px; font-size: .85rem; }
+body.movil .shift { font-size: .78rem; }
+body.movil .cell .note { font-size: .66rem; margin: auto 1px 1px; padding: 2px; -webkit-line-clamp: 3; }
+body.movil .cell .note.in { margin: 1px 0 0; padding: 0; -webkit-line-clamp: unset; }
+body.movil .shift.with-note { padding-top: 15px; }
+body.movil .shift + .shift.with-note { padding-top: 2px; }
+body.movil .top .nav { min-width: 28px; }
