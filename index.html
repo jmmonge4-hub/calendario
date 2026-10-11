@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mi Calendario</title>
+  <meta name="theme-color" content="#1f6feb">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Calendario">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <button id="prevYear" class="nav" title="Año anterior" aria-label="Año anterior">«</button>
+    <button id="prevMonth" class="nav" title="Mes anterior" aria-label="Mes anterior">‹</button>
+    <h1><span id="title"></span><i id="sync" class="sync" title=""></i></h1>
+    <button id="nextMonth" class="nav" title="Mes siguiente" aria-label="Mes siguiente">›</button>
+    <button id="nextYear" class="nav" title="Año siguiente" aria-label="Año siguiente">»</button>
+    <button id="today" class="today-btn" title="Ir a hoy">Hoy</button>
+  </header>
+
+  <main class="cal">
+    <div class="weekdays">
+      <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span class="we">S</span><span class="we">D</span>
+    </div>
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <!-- Barra inferior: resumen del mes y botón para pintar -->
+  <footer class="bar" id="bar">
+    <div id="summary" class="summary"></div>
+    <button id="install" hidden>Instalar</button>
+    <button id="paintBtn" class="paint-btn">✎ Pintar</button>
+  </footer>
+
+  <!-- Submenú de pintar (como Shifter): elige un turno y toca los días -->
+  <footer class="paint" id="paint" hidden>
+    <div id="palette" class="palette"></div>
+    <button id="paintDone" class="primary done">Hecho</button>
+  </footer>
+
+  <!-- Hoja del día: turnos y nota -->
+  <div id="daySheet" class="sheet" hidden>
+    <form class="sheet-box" id="dayForm">
+      <div class="sheet-head">
+        <strong id="dayTitle"></strong>
+        <button type="button" id="dayCancel" class="x" aria-label="Cerrar">✕</button>
+      </div>
+      <div id="dayExt" class="day-ext" hidden></div>
+      <div id="dayCats" class="day-cats"></div>
+      <label for="noteText">Nota</label>
+      <textarea id="noteText" rows="2" maxlength="200" placeholder="Ej.: guardia cambiada con Ana, curso de 9 a 14…"></textarea>
+      <div class="sheet-actions">
+        <button type="button" id="dayClear">Vaciar día</button>
+        <span></span>
+        <button type="submit" class="primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
