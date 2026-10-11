@@ -1,7 +1,7 @@
 // Guarda la app en caché para que abra sin conexión.
 // Con red, siempre pide la versión nueva al servidor (sin caché del navegador),
 // así lo que subas a GitHub aparece al abrir la app.
-const CACHE = "calendario-v15";
+const CACHE = "calendario-v16";
 const FILES = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.json",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-180.png"];
 

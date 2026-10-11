@@ -6,8 +6,8 @@ const CATEGORIES = [
   { id: "consulta", code: "C",   name: "Consulta",         color: "#1f6feb" },
   { id: "vacaciones", code: "V", name: "Vacaciones",       color: "#2da44e" },
   { id: "ocio", code: "OC",    name: "Ocio",  color: "#bf8700" },
-  { id: "curso", code: "CU",      name: "Curso/Formación",  color: "#8250df" },
-  { id: "festivo", code: "F",    name: "Festivo",          color: "#f2cc60", light: true },
+  { id: "curso", code: "F",       name: "Curso/Formación",  color: "#8250df" },
+  { id: "festivo", code: "FE",   name: "Festivo",          color: "#f2cc60", light: true },
   { id: "otro", code: "O",       name: "Otro",             color: "#57606a" },
 ];
 const CAT = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
