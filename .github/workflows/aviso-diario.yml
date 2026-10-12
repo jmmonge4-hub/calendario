@@ -1,0 +1,25 @@
+# Cada mañana manda al móvil (app ntfy) lo que tienes ese día.
+# Corre de madrugada y deja el aviso citado para las 8:00 de Madrid.
+# "Run workflow" a mano lo manda en el momento, para probar.
+name: Aviso diario al móvil
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  aviso:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Datos de hoy
+        run: python3 .github/generar_ics.py
+      - name: Mandar aviso
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'calendario-jm-a0563cc3ab' }}
+          EVENTO: ${{ github.event_name }}
+        run: python3 .github/aviso_diario.py
