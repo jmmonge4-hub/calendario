@@ -34,7 +34,6 @@ const saveLocal = () => store.set("cal-days", JSON.stringify(days));
 
 // ---------- Firestore (opcional) ----------
 let fs = null, db = null, unsubMonth = null;
-const pendingMonths = new Set();
 
 // Punto de estado junto al mes: verde sincronizado, ámbar local/sin red, rojo error
 function setSync(text) {
@@ -66,14 +65,11 @@ async function initFirebase() {
           else await au.signInWithPopup(auth, new au.GoogleAuthProvider());
         });
     }
-    // Junta lo guardado en local con lo de la nube (por día; gana lo local) y sube solo lo que falte
+    // Junta lo de este dispositivo con la nube día a día: gana el cambio más reciente
     const localMonths = new Set(Object.keys(days).map(k => k.slice(0, 7)));
     for (const mk of localMonths) {
       const snap = await fs.getDoc(fs.doc(db, cfg.dataCollection || "calendario_personal", mk));
-      const remote = snap.exists() ? (snap.data().days || {}) : {};
-      const differs = Object.keys(days).some(k => k.startsWith(mk) && JSON.stringify(days[k]) !== JSON.stringify(remote[k]));
-      for (const [k, v] of Object.entries(remote)) if (!(k in days)) days[k] = v;
-      if (differs) pendingMonths.add(mk);
+      mergeMonth(mk, snap.exists() ? (snap.data().days || {}) : {});
     }
     saveLocal(); render();
     flush();
@@ -85,31 +81,54 @@ async function initFirebase() {
   }
 }
 
+// Cada día lleva la hora de su último cambio (t). Borrar un día no quita la entrada:
+// la deja vacía con su hora, para que una copia vieja de otro dispositivo no lo resucite.
+// Los días de antes de este cambio no tienen hora (cuenta como 0) y ahí manda la nube.
+const stamp = v => Number(v?.t) || 0;
+function mergeMonth(mk, remote) {
+  for (const [k, v] of Object.entries(remote)) if (stamp(v) >= stamp(days[k])) days[k] = v;
+  for (const k of Object.keys(days)) {
+    if (!k.startsWith(mk)) continue;
+    if (!(k in remote) && !stamp(days[k])) delete days[k]; // sin hora y ya no está en la nube: se borró en otro sitio
+    else if (stamp(days[k]) > stamp(remote[k])) markPending(k); // cambio de aquí aún sin subir
+  }
+}
+
 function watchMonth() {
   if (!db) return;
   unsubMonth?.();
   const mk = monthKey(year, month);
   unsubMonth = fs.onSnapshot(fs.doc(db, cfg.dataCollection || "calendario_personal", mk), snap => {
-    const remote = snap.exists() ? (snap.data().days || {}) : {};
-    if (pendingMonths.has(mk)) return; // hay cambios locales sin subir
-    for (const k of Object.keys(days)) if (k.startsWith(mk) && !remote[k]) delete days[k];
-    Object.assign(days, remote);
-    saveLocal(); render();
+    mergeMonth(mk, snap.exists() ? (snap.data().days || {}) : {});
+    saveLocal(); render(); flush();
     setSync(snap.metadata.hasPendingWrites ? "Guardando…" : snap.metadata.fromCache ? "Sin red (se sincronizará)" : "Sincronizado");
   }, e => { console.error(e); setSync("Error de permisos en Firestore"); });
 }
 
+// Días cambiados aquí que faltan por subir; se guardan para no perderlos si se cierra la app
+const pending = new Set((() => { try { return JSON.parse(store.get("cal-pending", "[]")); } catch { return []; } })());
+const savePending = () => store.set("cal-pending", JSON.stringify([...pending]));
+function markPending(k) { pending.add(k); savePending(); }
+
 let flushTimer = null;
 function flush() {
-  if (!db) return;
+  if (!db || !pending.size) return;
   clearTimeout(flushTimer);
-  flushTimer = setTimeout(async () => {
-    for (const mk of [...pendingMonths]) {
-      const monthDays = Object.fromEntries(Object.entries(days).filter(([k]) => k.startsWith(mk)));
-      try {
-        await fs.setDoc(fs.doc(db, cfg.dataCollection || "calendario_personal", mk), { days: monthDays, updated: Date.now() });
-        pendingMonths.delete(mk);
-      } catch (e) { console.error(e); setSync("No se pudo guardar en Firestore"); }
+  flushTimer = setTimeout(() => {
+    const byMonth = {};
+    for (const k of [...pending]) {
+      if (days[k]) (byMonth[k.slice(0, 7)] ||= {})[k] = days[k]; else pending.delete(k);
+    }
+    savePending();
+    for (const [mk, changed] of Object.entries(byMonth)) {
+      // Solo se reescriben los días cambiados (enteros); el resto del mes en la nube no se toca
+      const fields = [...Object.keys(changed).map(k => new fs.FieldPath("days", k)), "updated"];
+      fs.setDoc(fs.doc(db, cfg.dataCollection || "calendario_personal", mk), { days: changed, updated: Date.now() }, { mergeFields: fields })
+        .then(() => {
+          for (const k of Object.keys(changed)) if (stamp(days[k]) <= stamp(changed[k])) pending.delete(k);
+          savePending();
+        })
+        .catch(e => { console.error(e); setSync("No se pudo guardar en Firestore"); });
     }
   }, 400);
 }
@@ -189,9 +208,11 @@ const shifts = info => Array.isArray(info.c) ? info.c : info.c ? [info.c] : [];
 
 // Guarda un día y lo sincroniza
 function saveDay(key, cur) {
-  if (cur.c?.length || cur.n || cur.h?.length) days[key] = cur; else delete days[key];
+  const { t, ...rest } = cur;
+  // Un día vacío se queda como { t } para que el borrado también se sincronice
+  days[key] = { ...(rest.c?.length || rest.n || rest.h?.length ? rest : {}), t: Math.max(Date.now(), stamp(days[key]) + 1) };
   saveLocal();
-  pendingMonths.add(key.slice(0, 7));
+  markPending(key);
   flush();
   render();
 }
