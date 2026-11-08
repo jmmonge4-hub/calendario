@@ -35,12 +35,14 @@ const saveLocal = () => store.set("cal-days", JSON.stringify(days));
 // ---------- Firestore (opcional) ----------
 let fs = null, db = null, unsubMonth = null;
 
-// Punto de estado junto al mes: verde sincronizado, ámbar local/sin red, rojo error
+// Bombilla junto al mes: verde = conectado a la base de datos, rojo = no (se guarda solo en el móvil).
+// Tocándola se ve el detalle.
 function setSync(text) {
   const el = $("sync");
   el.title = text; el.setAttribute("aria-label", text);
-  el.className = "sync " + (/Error|No se pud/.test(text) ? "err" : text === "Sincronizado" ? "ok" : "warn");
+  el.className = "sync " + (text === "Conectando…" ? "" : /^(Sincronizado|Guardando…)$/.test(text) ? "ok" : "err");
 }
+$("sync").addEventListener("click", e => { e.stopPropagation(); alert($("sync").title || "Comprobando conexión…"); });
 
 async function initFirebase() {
   if (!cfg.firebaseConfig) {
