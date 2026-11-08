@@ -2,7 +2,7 @@
 #  - la planificación (villarramiel/turnos_guardias): guardias, permisos (como vacaciones) y festivos de Juan Manuel
 #  - tus colores y notas (colección calendario_personal)
 # Solo lee de Firestore; no escribe nada allí.
-import json, re, urllib.request, datetime
+import json, os, re, sys, urllib.error, urllib.request, datetime
 
 PROYECTO = "padel-gestor"
 CLAVE = "AIzaSyBLc4g0YhCPMM8x67wA_CttGu-FkqMKg0U"
@@ -27,8 +27,19 @@ def sin_tildes(s):
     import unicodedata
     return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn").lower()
 
+def sin_acceso(e):
+    """Firestore no deja leer (p. ej. han cambiado sus reglas): se deja el calendario.ics
+    anterior tal cual y se avisa, en vez de romper la ejecución."""
+    print(f"::warning::No se pudo leer Firestore ({e}). Se mantiene el calendario.ics anterior.")
+    if os.environ.get("GITHUB_ENV"):
+        with open(os.environ["GITHUB_ENV"], "a") as f: f.write("ICS_ANTIGUO=1\n")
+    sys.exit(0)
+
 # Planificación -> {"2026-10-05": ["guardia", ...]}
-planif = {k: valor(v) for k, v in get(f"{BASE}/villarramiel/turnos_guardias?key={CLAVE}")["fields"].items()}
+try:
+    planif = {k: valor(v) for k, v in get(f"{BASE}/villarramiel/turnos_guardias?key={CLAVE}")["fields"].items()}
+except (urllib.error.URLError, KeyError) as e:
+    sin_acceso(e)
 yo = next(i for i, w in enumerate(planif.get("trabajadores", [])) if MEDICO in sin_tildes(str(w)))
 ext = {}
 def add(clave_mes, dia, cat):
@@ -50,7 +61,8 @@ dias = {}
 url = f"{BASE}/calendario_personal?key={CLAVE}&pageSize=300"
 token = None
 while True:
-    r = get(url + (f"&pageToken={token}" if token else ""))
+    try: r = get(url + (f"&pageToken={token}" if token else ""))
+    except urllib.error.URLError as e: sin_acceso(e)
     for doc in r.get("documents", []):
         dias.update(valor(doc["fields"].get("days", {"mapValue": {}})) or {})
     token = r.get("nextPageToken")

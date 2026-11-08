@@ -35,6 +35,8 @@ MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto
          "septiembre", "octubre", "noviembre", "diciembre"]
 titulo = f"Hoy, {DIAS[hoy.weekday()]} {hoy.day} de {MESES[hoy.month - 1]}"
 cuerpo = "\n".join(lineas) or "Nada apuntado. ¡Día libre!"
+if os.environ.get("ICS_ANTIGUO"):
+    cuerpo += "\n⚠️ No se pudo leer la planificación: datos de la última copia guardada."
 
 datos = {"topic": TEMA, "title": titulo, "message": cuerpo, "click": APP, "tags": ["calendar"]}
 # Programado: se entrega a las 8:00 de Madrid (si aún no han pasado)
