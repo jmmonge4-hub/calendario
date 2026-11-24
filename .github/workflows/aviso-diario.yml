@@ -17,7 +17,12 @@ jobs:
         with:
           python-version: "3.12"
       - name: Datos de hoy
-        run: python3 .github/generar_ics.py
+        env:
+          PORTAL_FIREBASE_SA: ${{ secrets.PORTAL_FIREBASE_SA }}
+        run: |
+          pip install -q google-auth requests
+          python3 .github/exportar_portal.py
+          python3 .github/generar_ics.py
       - name: Mandar aviso
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'calendario-jm-a0563cc3ab' }}

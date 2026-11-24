@@ -36,11 +36,8 @@ def sin_acceso(e):
     sys.exit(0)
 
 # Planificación -> {"2026-10-05": ["guardia", ...]}
-try:
-    planif = {k: valor(v) for k, v in get(f"{BASE}/villarramiel/turnos_guardias?key={CLAVE}")["fields"].items()}
-except (urllib.error.URLError, KeyError) as e:
-    sin_acceso(e)
-yo = next(i for i, w in enumerate(planif.get("trabajadores", [])) if MEDICO in sin_tildes(str(w)))
+# Primero planif.json (copia del portal nuevo que hace exportar_portal.py); si no existe,
+# el documento antiguo villarramiel/turnos_guardias.
 ext = {}
 def add(clave_mes, dia, cat):
     y, m = map(int, clave_mes.split("-"))
@@ -48,25 +45,53 @@ def add(clave_mes, dia, cat):
     except ValueError: return
     ext.setdefault(k, [])
     if cat not in ext[k]: ext[k].append(cat)
-for km, dias in (planif.get("asignaciones") or {}).items():
-    for d, w in (dias or {}).items():
-        if int(w) == yo: add(km, d, "guardia")
-for km, porMedico in (planif.get("permisos") or {}).items():
-    for d in (porMedico or {}).get(str(yo)) or []: add(km, d, "vacaciones")
-for km, dias in (planif.get("festivos") or {}).items():
-    for d in dias or []: add(km, d, "festivo")
+meses_portal = set()
+if os.path.exists("planif.json"):
+    pj = json.load(open("planif.json", encoding="utf-8"))
+    for cat, campo in (("guardia", "g"), ("vacaciones", "p"), ("festivo", "f")):
+        for km, ds in (pj.get(campo) or {}).items():
+            for d in ds: add(km, d, cat)
+    meses_portal = set(pj.get("g") or {}) | set(pj.get("p") or {})
+else:
+    try:
+        planif = {k: valor(v) for k, v in get(f"{BASE}/villarramiel/turnos_guardias?key={CLAVE}")["fields"].items()}
+    except (urllib.error.URLError, KeyError) as e:
+        sin_acceso(e)
+    yo = next(i for i, w in enumerate(planif.get("trabajadores", [])) if MEDICO in sin_tildes(str(w)))
+    for km, dias in (planif.get("asignaciones") or {}).items():
+        for d, w in (dias or {}).items():
+            if int(w) == yo: add(km, d, "guardia")
+    for km, porMedico in (planif.get("permisos") or {}).items():
+        for d in (porMedico or {}).get(str(yo)) or []: add(km, d, "vacaciones")
+    for km, dias in (planif.get("festivos") or {}).items():
+        for d in dias or []: add(km, d, "festivo")
 
-# Tus días
+# Tus días (colores y notas). Si calendario_personal no se deja leer, se usa la última
+# copia guardada en personal.json.
 dias = {}
 url = f"{BASE}/calendario_personal?key={CLAVE}&pageSize=300"
 token = None
-while True:
-    try: r = get(url + (f"&pageToken={token}" if token else ""))
-    except urllib.error.URLError as e: sin_acceso(e)
-    for doc in r.get("documents", []):
-        dias.update(valor(doc["fields"].get("days", {"mapValue": {}})) or {})
-    token = r.get("nextPageToken")
-    if not token: break
+try:
+    while True:
+        r = get(url + (f"&pageToken={token}" if token else ""))
+        for doc in r.get("documents", []):
+            dias.update(valor(doc["fields"].get("days", {"mapValue": {}})) or {})
+        token = r.get("nextPageToken")
+        if not token: break
+    with open("personal.json", "w", encoding="utf-8") as fh:
+        json.dump({"dias": dict(sorted(dias.items()))}, fh, ensure_ascii=False, separators=(",", ":"))
+except (urllib.error.URLError, KeyError) as e:
+    if not os.path.exists("personal.json"): sin_acceso(e)
+    print(f"::warning::No se pudo leer calendario_personal ({e}). Uso la copia de personal.json.")
+    copia = json.load(open("personal.json", encoding="utf-8"))
+    dias = copia["dias"]
+    if copia.get("desde_ics"):
+        # Copia sacada del calendario.ics viejo: ahí guardias/vacaciones/festivos venían mezclados
+        # con la planificación; en los meses que ya trae el portal mandan los del portal.
+        for k, info in dias.items():
+            y, m, _ = map(int, k.split("-"))
+            if f"{y}-{m - 1}" in meses_portal or k in ext:
+                info["c"] = [c for c in info.get("c", []) if c not in ("guardia", "vacaciones", "festivo")]
 
 def esc(s): return s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 def plegar(linea):  # líneas de máx. 75 bytes (formato iCalendar)

@@ -169,6 +169,18 @@ async function loadPlanif() {
   const pc = cfg.planificacion;
   if (!pc) return;
   if (!navigator.onLine) { setPlanifStatus(); return; }
+  // Primero la copia del portal nuevo (planif.json, la actualiza GitHub cada 6 horas)
+  try {
+    const r = await fetch("planif.json", { cache: "no-cache" });
+    if (r.ok) {
+      const pj = await r.json();
+      planif = { name: pj.name, g: pj.g || {}, p: pj.p || {}, f: pj.f || {}, at: pj.at || Date.now() };
+      store.set("cal-planif", JSON.stringify(planif));
+      setPlanifStatus();
+      render();
+      return;
+    }
+  } catch (e) { console.warn("planif.json", e); }
   try {
     const { appMod, fsMod } = await loadFirebase();
     if (!planifDb) planifDb = fsMod.getFirestore(appMod.initializeApp(pc.firebaseConfig, "planificacion"));
