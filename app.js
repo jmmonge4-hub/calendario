@@ -153,58 +153,60 @@ function extFor(y, m, d) {
   return out;
 }
 
-let fbMods = null;
-async function loadFirebase() {
-  if (fbMods) return fbMods;
-  const V = "10.12.2";
-  const [appMod, fsMod] = await Promise.all([
-    import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),
-    import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`),
-  ]);
-  return (fbMods = { appMod, fsMod });
+// Desde el 20-11-2026 la planificación (portal https://portal-medicos-villarramiel.web.app,
+// Firebase padel-gestor) solo deja leer con sesión: aquí se entra con tu cuenta de Google
+// (la del administrador) y la app escucha el documento EN DIRECTO. Solo lectura.
+const FB_V = "10.12.2", FB_BASE = `https://www.gstatic.com/firebasejs/${FB_V}`;
+let planifApp = null, planifAu = null, planifAuth = null, planifStop = null;
+async function initPlanifAuth() {
+  if (planifAuth) return;
+  const [appMod, au] = await Promise.all([import(`${FB_BASE}/firebase-app.js`), import(`${FB_BASE}/firebase-auth.js`)]);
+  planifApp = appMod.initializeApp(cfg.planificacion.firebaseConfig, "planificacion");
+  planifAu = au; planifAuth = au.getAuth(planifApp); planifAuth.languageCode = "es";
+  try { await au.getRedirectResult(planifAuth); } catch (e) { console.warn(e); }
+  await planifAuth.authStateReady();
 }
 
-let planifDb = null;
+function parsePlanif(data) {
+  const pc = cfg.planificacion;
+  const workers = (data.trabajadores || []).map(w => typeof w === "string" ? w : w?.nombre ?? "");
+  const me = workers.findIndex(w => norm(w).includes(norm(pc.worker)));
+  if (me < 0) throw new Error(`No encuentro a ${pc.worker} en la planificación`);
+  const g = {}, p = {}, f = {};
+  for (const [k, byDay] of Object.entries(data.asignaciones || {})) {
+    const ds = Object.entries(byDay || {}).filter(([, w]) => Number(w) === me).map(([d]) => Number(d));
+    if (ds.length) g[k] = ds;
+  }
+  for (const [k, byWorker] of Object.entries(data.permisos || {})) {
+    const ds = byWorker?.[me];
+    if (Array.isArray(ds) && ds.length) p[k] = ds.map(Number);
+  }
+  for (const [k, ds] of Object.entries(data.festivos || {})) if (Array.isArray(ds) && ds.length) f[k] = ds.map(Number);
+  return { name: workers[me], g, p, f, at: Date.now() };
+}
+
 async function loadPlanif() {
   const pc = cfg.planificacion;
-  if (!pc) return;
-  if (portalLive) return; // el portal en directo ya la mantiene al día
+  if (!pc || planifStop) return; // si ya está escuchando en directo, no hace falta más
   if (!navigator.onLine) { setPlanifStatus(); return; }
-  // Primero la copia del portal nuevo (planif.json, la actualiza GitHub cada 6 horas)
   try {
-    const r = await fetch("planif.json", { cache: "no-cache" });
-    if (r.ok) {
-      const pj = await r.json();
-      planif = { name: pj.name, g: pj.g || {}, p: pj.p || {}, f: pj.f || {}, at: pj.at || Date.now() };
+    await initPlanifAuth();
+    if (!planifAuth.currentUser) { $("portalBtn").hidden = false; setPlanifStatus(); return; }
+    $("portalBtn").hidden = true;
+    const fsMod = await import(`${FB_BASE}/firebase-firestore.js`);
+    const pdb = fsMod.getFirestore(planifApp);
+    planifStop = fsMod.onSnapshot(fsMod.doc(pdb, pc.collection, pc.document), snap => {
+      if (!snap.exists()) return setSync("Error: no existe el documento de la planificación");
+      try { planif = parsePlanif(snap.data()); } catch (e) { return setSync("Error: " + e.message); }
       store.set("cal-planif", JSON.stringify(planif));
-      setPlanifStatus();
-      render();
-      return;
-    }
-  } catch (e) { console.warn("planif.json", e); }
-  try {
-    const { appMod, fsMod } = await loadFirebase();
-    if (!planifDb) planifDb = fsMod.getFirestore(appMod.initializeApp(pc.firebaseConfig, "planificacion"));
-    const snap = await fsMod.getDoc(fsMod.doc(planifDb, pc.collection, pc.document));
-    if (!snap.exists()) throw new Error("No existe el documento de la planificación");
-    const data = snap.data();
-    const workers = (data.trabajadores || []).map(w => typeof w === "string" ? w : w?.nombre ?? "");
-    const me = workers.findIndex(w => norm(w).includes(norm(pc.worker)));
-    if (me < 0) { setSync(`Error: no encuentro a ${pc.worker} en la planificación`); return; }
-    const g = {}, p = {}, f = {};
-    for (const [k, byDay] of Object.entries(data.asignaciones || {})) {
-      const ds = Object.entries(byDay || {}).filter(([, w]) => Number(w) === me).map(([d]) => Number(d));
-      if (ds.length) g[k] = ds;
-    }
-    for (const [k, byWorker] of Object.entries(data.permisos || {})) {
-      const ds = byWorker?.[me];
-      if (Array.isArray(ds) && ds.length) p[k] = ds.map(Number);
-    }
-    for (const [k, ds] of Object.entries(data.festivos || {})) if (Array.isArray(ds) && ds.length) f[k] = ds.map(Number);
-    planif = { name: workers[me], g, p, f, at: Date.now() };
-    store.set("cal-planif", JSON.stringify(planif));
-    setPlanifStatus();
-    render();
+      setPlanifStatus(); render();
+    }, e => {
+      console.error(e); planifStop = null;
+      if (e.code === "permission-denied") {
+        $("portalBtn").hidden = false;
+        setSync(`La planificación no deja leer con ${planifAuth.currentUser?.email || "esta cuenta"} (entra con tu Gmail de administrador)`);
+      } else setSync("No se pudo leer la planificación (uso la última copia)");
+    });
   } catch (e) {
     console.error(e);
     setSync(planif ? "No se pudo actualizar la planificación (uso la última copia)" : "Error: no se pudo leer la planificación");
@@ -218,96 +220,20 @@ function setPlanifStatus() {
 addEventListener("online", loadPlanif);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) loadPlanif(); });
 
-
-// ---------- Portal Médicos Villarramiel v2 en directo (solo lectura) ----------
-// Con tu sesión del portal, la app escucha tus guardias, permisos y festivos al momento.
-// Sin sesión (o si falla), se usa planif.json, la copia que hace GitHub cada 6 horas.
-let portalLive = false, portalAuth = null, portalAu = null, portalStop = [];
-const fechaPortal = (a, m, d) => new Date(a, m, d);
-function pascua(a) {
-  const b = Math.floor(a / 100), c = a % 100, h = (19 * (a % 19) + b - Math.floor(b / 4) - Math.floor((b - Math.floor((b + 8) / 25) + 1) / 3) + 15) % 30;
-  const l = (32 + 2 * (b % 4) + 2 * Math.floor(c / 4) - h - c % 4) % 7, m = Math.floor((a % 19 + 11 * h + 22 * l) / 451);
-  return new Date(a, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1);
-}
-function festivosPorDefecto(a) {
-  const p = pascua(a), menos = n => new Date(p.getFullYear(), p.getMonth(), p.getDate() - n);
-  return [[0, 1], [0, 6], [3, 23], [4, 1], [7, 15], [7, 24], [8, 21], [9, 12], [10, 1], [11, 6], [11, 8], [11, 25]]
-    .map(([m, d]) => fechaPortal(a, m, d)).concat([menos(3), menos(2)]);
-}
-function planifDesdePortal(lista, meses, festGuardados) {
-  const pc = cfg.portal;
-  const yo = (lista || []).find(m => norm(m?.nombre || "").includes(norm(pc.worker)));
-  if (!yo) throw new Error(`No encuentro a ${pc.worker} en los médicos de guardia del portal`);
-  const g = {}, p = {}, f = {}, anios = new Set();
-  for (const [k, mes] of Object.entries(meses)) {
-    const [a, m] = k.split("-").map(Number); if (!a || !m) continue;
-    const ka = `${a}-${m - 1}`; anios.add(a);
-    const ds = Object.entries(mes.asign || {}).filter(([, id]) => id === yo.id).map(([d]) => Number(d)).sort((x, y) => x - y);
-    if (ds.length) g[ka] = ds;
-    const pe = [...new Set((mes.permisos?.[yo.id] || []).map(Number))].sort((x, y) => x - y);
-    if (pe.length) p[ka] = pe;
-  }
-  const hoy = new Date().getFullYear();
-  for (let a = hoy - 1; a <= hoy + 2; a++) anios.add(a);
-  for (const a of anios) {
-    const guard = festGuardados?.[String(a)];
-    const fechas = Array.isArray(guard) ? guard.filter(x => x?.f).map(x => { const [y, m, d] = x.f.split("-").map(Number); return fechaPortal(y, m - 1, d); }) : festivosPorDefecto(a);
-    for (const x of fechas) (f[`${x.getFullYear()}-${x.getMonth()}`] ||= []).push(x.getDate());
-  }
-  for (const k in f) f[k] = [...new Set(f[k])].sort((x, y) => x - y);
-  return { name: yo.nombre, g, p, f, at: Date.now(), live: true };
-}
-
-async function initPortal() {
-  const pc = cfg.portal;
-  if (!pc || !navigator.onLine) return false;
-  try {
-    const V = "10.12.2", base = `https://www.gstatic.com/firebasejs/${V}`;
-    const [appMod, fsMod, au, ac] = await Promise.all([
-      import(`${base}/firebase-app.js`), import(`${base}/firebase-firestore.js`),
-      import(`${base}/firebase-auth.js`), import(`${base}/firebase-app-check.js`)]);
-    const app = appMod.initializeApp(pc.firebaseConfig, "portal");
-    if (pc.recaptchaEnterpriseKey)
-      ac.initializeAppCheck(app, { provider: new ac.ReCaptchaEnterpriseProvider(pc.recaptchaEnterpriseKey), isTokenAutoRefreshEnabled: true });
-    portalAu = au; portalAuth = au.getAuth(app); portalAuth.languageCode = "es";
-    try { await au.getRedirectResult(portalAuth); } catch (e) { console.warn(e); }
-    const user = await new Promise(res => { const off = au.onAuthStateChanged(portalAuth, u => { off(); res(u); }); });
-    if (!user) { $("portalBtn").hidden = false; return false; }
-    const pdb = fsMod.getFirestore(app);
-    let lista = null, meses = null, fest = {};
-    const avisarError = e => {
-      console.error(e); portalLive = false; portalStop.forEach(f => f()); portalStop = [];
-      setSync("No se pudo leer el portal en directo (uso la copia de GitHub)"); $("portalBtn").hidden = false;
-      loadPlanif();
-    };
-    const recalcular = () => {
-      if (!lista || !meses) return;
-      try { planif = planifDesdePortal(lista, meses, fest); } catch (e) { return avisarError(e); }
-      store.set("cal-planif", JSON.stringify(planif)); render();
-    };
-    portalStop.push(
-      fsMod.onSnapshot(fsMod.doc(pdb, "config", "medicos_guardias"), s => { lista = s.exists() ? s.data().lista || [] : []; recalcular(); }, avisarError),
-      fsMod.onSnapshot(fsMod.doc(pdb, "config", "festivos"), s => { fest = s.exists() ? s.data().anios || {} : {}; recalcular(); }, avisarError),
-      fsMod.onSnapshot(fsMod.collection(pdb, "guardias"), s => {
-        meses = {}; s.forEach(d => { meses[d.id] = d.data(); }); recalcular();
-      }, avisarError));
-    portalLive = true; $("portalBtn").hidden = true;
-    return true;
-  } catch (e) {
-    console.error(e);
-    return false;
-  }
-}
 $("portalBtn").onclick = async () => {
-  if (!portalAuth) { await initPortal(); if (!portalAuth) return alert("No se puede conectar con el portal ahora mismo."); }
-  const prov = new portalAu.GoogleAuthProvider();
-  try { await portalAu.signInWithPopup(portalAuth, prov); }
-  catch (e) {
-    if (/popup|operation-not-supported/.test(e.code || "")) return portalAu.signInWithRedirect(portalAuth, prov);
-    if (e.code !== "auth/cancelled-popup-request" && e.code !== "auth/popup-closed-by-user") alert("No se pudo entrar en el portal: " + (e.code || e.message));
+  try { await initPlanifAuth(); } catch { return alert("No se puede conectar ahora mismo. Prueba con conexión a internet."); }
+  const prov = new planifAu.GoogleAuthProvider();
+  prov.setCustomParameters({ prompt: "select_account" });
+  try {
+    if (planifAuth.currentUser) await planifAu.signOut(planifAuth);
+    await planifAu.signInWithPopup(planifAuth, prov);
+  } catch (e) {
+    if (/popup-blocked|operation-not-supported/.test(e.code || "")) return planifAu.signInWithRedirect(planifAuth, prov);
+    if (!/popup-closed|cancelled-popup/.test(e.code || "")) alert("No se pudo entrar: " + (e.code || e.message));
     return;
   }
-  if (!(await initPortal())) alert("Has entrado, pero el portal no deja leer las guardias desde aquí.");
+  planifStop?.(); planifStop = null;
+  loadPlanif();
 };
 
 // ---------- Pintado ----------
@@ -557,4 +483,4 @@ if ("serviceWorker" in navigator) {
 }
 
 render();
-initFirebase().then(async () => { setPlanifStatus(); if (!(await initPortal())) loadPlanif(); });
+initFirebase().then(() => { setPlanifStatus(); loadPlanif(); });
