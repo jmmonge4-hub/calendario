@@ -27,7 +27,22 @@ window.CAL_CONFIG = {
   // Colección NUEVA donde se guardan tus colores y notas (un documento por mes)
   dataCollection: "calendario_personal",
 
-  // Planificación de guardias (herramienta "Control de Turnos"). SOLO LECTURA:
+  // Portal Médicos Villarramiel v2: guardias, permisos y festivos EN DIRECTO (solo lectura),
+  // con tu sesión del portal. Si no hay sesión, se usa planif.json (copia de GitHub).
+  portal: {
+    firebaseConfig: {
+      apiKey: "AIzaSyDPsTL_T0LnELEjnpN7WwzglJTlsKFVEEk",
+      authDomain: "portal-villarramiel-v2.firebaseapp.com",
+      projectId: "portal-villarramiel-v2",
+      storageBucket: "portal-villarramiel-v2.firebasestorage.app",
+      messagingSenderId: "493971931349",
+      appId: "1:493971931349:web:9ec6b2dc7c92459bcee25c"
+    },
+    recaptchaEnterpriseKey: "6LfBEQ4uAAAAAGwSPCP4SvUNhq_nLrWB5sf_8RJV",
+    worker: "Juan Manuel"
+  },
+
+  // Planificación de guardias antigua (herramienta "Control de Turnos"). SOLO LECTURA:
   // de aquí se leen tus guardias, permisos y festivos; nunca se escribe.
   planificacion: {
     firebaseConfig: {

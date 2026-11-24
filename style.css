@@ -160,3 +160,4 @@ body.movil .cell .note.in { margin: 1px 0 0; padding: 0; -webkit-line-clamp: uns
 body.movil .shift.with-note { padding-top: 15px; }
 body.movil .shift + .shift.with-note { padding-top: 2px; }
 body.movil .top .nav { min-width: 28px; }
+.portal-btn { font-size: 13px; white-space: nowrap; }
