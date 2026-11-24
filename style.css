@@ -161,3 +161,4 @@ body.movil .shift.with-note { padding-top: 15px; }
 body.movil .shift + .shift.with-note { padding-top: 2px; }
 body.movil .top .nav { min-width: 28px; }
 .portal-btn { font-size: 13px; white-space: nowrap; }
+.app-ver { font-size: 11px; color: var(--muted); }

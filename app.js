@@ -13,6 +13,7 @@ const CATEGORIES = [
 const CAT = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 const BRUSH_ERASE = "_borrar";
 
+const APP_VERSION = "28"; // súbelo junto con CACHE de sw.js
 const cfg = window.CAL_CONFIG || {};
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, "0");
@@ -42,7 +43,8 @@ function setSync(text) {
   el.title = text; el.setAttribute("aria-label", text);
   el.className = "sync " + (text === "Conectando…" ? "" : /^(Sincronizado|Guardando…)$/.test(text) ? "ok" : "err");
 }
-$("sync").addEventListener("click", e => { e.stopPropagation(); alert($("sync").title || "Comprobando conexión…"); });
+$("sync").addEventListener("click", e => { e.stopPropagation(); alert(($("sync").title || "Comprobando conexión…") + `\n\nVersión ${APP_VERSION}` + (planifAuth?.currentUser ? " · conectado a la planificación" : " · sin conectar a la planificación")); });
+$("appVer").textContent = "v" + APP_VERSION;
 
 async function initFirebase() {
   if (!cfg.firebaseConfig) {
@@ -157,7 +159,7 @@ function extFor(y, m, d) {
 // Firebase padel-gestor) solo deja leer con sesión: aquí se entra igual que en el portal,
 // y con tu código del portal; la app escucha el documento EN DIRECTO. Solo lectura.
 const FB_V = "10.12.2", FB_BASE = `https://www.gstatic.com/firebasejs/${FB_V}`;
-let planifApp = null, planifAu = null, planifAuth = null, planifStop = null, planifError = "";
+let pinPedido = false, planifApp = null, planifAu = null, planifAuth = null, planifStop = null, planifError = "";
 async function initPlanifAuth() {
   if (planifAuth) return;
   const [appMod, au] = await Promise.all([import(`${FB_BASE}/firebase-app.js`), import(`${FB_BASE}/firebase-auth.js`)]);
@@ -191,7 +193,12 @@ async function loadPlanif() {
   if (!navigator.onLine) { setPlanifStatus(); return; }
   try {
     await initPlanifAuth();
-    if (!planifAuth.currentUser) { $("portalBtn").hidden = false; setPlanifStatus(); return; }
+    if (!planifAuth.currentUser) {
+      $("portalBtn").hidden = false; setPlanifStatus();
+      // Sin sesión: pide el código del portal una vez al abrir (luego entra solo)
+      if (!pinPedido) { pinPedido = true; setTimeout(() => $("portalBtn").click(), 300); }
+      return;
+    }
     $("portalBtn").hidden = true;
     const fsMod = await import(`${FB_BASE}/firebase-firestore.js`);
     const pdb = fsMod.getFirestore(planifApp);
