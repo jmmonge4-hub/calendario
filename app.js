@@ -154,8 +154,8 @@ function extFor(y, m, d) {
 }
 
 // Desde el 20-11-2026 la planificación (portal https://portal-medicos-villarramiel.web.app,
-// Firebase padel-gestor) solo deja leer con sesión: aquí se entra con tu cuenta de Google
-// (la del administrador) y la app escucha el documento EN DIRECTO. Solo lectura.
+// Firebase padel-gestor) solo deja leer con sesión: aquí se entra igual que en el portal,
+// y con tu código del portal; la app escucha el documento EN DIRECTO. Solo lectura.
 const FB_V = "10.12.2", FB_BASE = `https://www.gstatic.com/firebasejs/${FB_V}`;
 let planifApp = null, planifAu = null, planifAuth = null, planifStop = null, planifError = "";
 async function initPlanifAuth() {
@@ -202,11 +202,11 @@ async function loadPlanif() {
       setPlanifStatus(); render();
     }, e => {
       console.error(e); planifStop = null; $("portalBtn").hidden = false;
-      planifError = `La planificación no deja leer con ${planifAuth.currentUser?.email || "esta cuenta"} (${e.code || e.message})`;
+      planifError = e.code === "permission-denied" ? "Ese código no tiene permiso para ver la planificación." : "No se pudo leer la planificación: " + (e.code || e.message);
       alert(planifError);
       if (e.code === "permission-denied") {
         $("portalBtn").hidden = false;
-        setSync(`La planificación no deja leer con ${planifAuth.currentUser?.email || "esta cuenta"} (entra con tu Gmail de administrador)`);
+        setSync("Tu código no tiene permiso para leer la planificación");
       } else setSync("No se pudo leer la planificación (uso la última copia)");
     });
   } catch (e) {
@@ -224,22 +224,33 @@ function setPlanifStatus() {
 addEventListener("online", loadPlanif);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) loadPlanif(); });
 
+// Entrar como en el portal: con tu código (PIN). Se convierte en la misma cuenta de Firebase que usa
+// el portal (seguridad.js de centro-de-salud) y la sesión se queda guardada en este móvil:
+// las siguientes veces entra solo. El código no se guarda en ningún sitio.
+async function cuentaDeCodigo(codigo) {
+  const txt = "cs-villarramiel/acceso/v1/" + String(codigo ?? "").trim().toLowerCase();
+  const h = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)))]
+    .map(x => x.toString(16).padStart(2, "0")).join("");
+  return { correo: `u${h.slice(0, 32)}@portal-villarramiel.web.app`, clave: `cs1-${h.slice(32)}` };
+}
 $("portalBtn").onclick = async () => {
   try { await initPlanifAuth(); } catch (e) { return alert("No se puede conectar ahora mismo: " + (e.code || e.message)); }
-  const prov = new planifAu.GoogleAuthProvider();
-  prov.setCustomParameters({ prompt: "select_account" });
+  const codigo = prompt("Escribe tu código (PIN) del portal. Solo se pide una vez en este móvil.");
+  if (!codigo || !codigo.trim()) return;
   try {
+    const { correo, clave } = await cuentaDeCodigo(codigo);
     if (planifAuth.currentUser) await planifAu.signOut(planifAuth);
-    await planifAu.signInWithPopup(planifAuth, prov);
+    await planifAu.signInWithEmailAndPassword(planifAuth, correo, clave);
   } catch (e) {
-    if (/popup-blocked|operation-not-supported/.test(e.code || "")) return planifAu.signInWithRedirect(planifAuth, prov);
-    if (e.code === "auth/unauthorized-domain") alert("Falta autorizar jmmonge4-hub.github.io en Firebase (padel-gestor → Authentication → Configuración → Dominios autorizados).");
-    else if (!/popup-closed|cancelled-popup/.test(e.code || "")) alert("No se pudo entrar: " + (e.code || e.message));
-    return;
+    const c = e.code || "";
+    return alert(c === "auth/too-many-requests" ? "Demasiados intentos: espera unos minutos."
+      : c === "auth/network-request-failed" ? "No hay conexión. Inténtalo de nuevo."
+      : /invalid|wrong-password|user-not-found/.test(c) ? "Código no válido."
+      : "No se pudo entrar: " + (c || e.message));
   }
   planifStop?.(); planifStop = null;
   await loadPlanif();
-  if (planifStop) alert(`Conectado como ${planifAuth.currentUser.email}. Las guardias se actualizan solas.`);
+  if (planifStop) alert("Conectado. Las guardias y permisos se actualizan solos.");
 };
 
 // ---------- Pintado ----------
