@@ -157,7 +157,7 @@ function extFor(y, m, d) {
 // Firebase padel-gestor) solo deja leer con sesión: aquí se entra con tu cuenta de Google
 // (la del administrador) y la app escucha el documento EN DIRECTO. Solo lectura.
 const FB_V = "10.12.2", FB_BASE = `https://www.gstatic.com/firebasejs/${FB_V}`;
-let planifApp = null, planifAu = null, planifAuth = null, planifStop = null;
+let planifApp = null, planifAu = null, planifAuth = null, planifStop = null, planifError = "";
 async function initPlanifAuth() {
   if (planifAuth) return;
   const [appMod, au] = await Promise.all([import(`${FB_BASE}/firebase-app.js`), import(`${FB_BASE}/firebase-auth.js`)]);
@@ -201,7 +201,9 @@ async function loadPlanif() {
       store.set("cal-planif", JSON.stringify(planif));
       setPlanifStatus(); render();
     }, e => {
-      console.error(e); planifStop = null;
+      console.error(e); planifStop = null; $("portalBtn").hidden = false;
+      planifError = `La planificación no deja leer con ${planifAuth.currentUser?.email || "esta cuenta"} (${e.code || e.message})`;
+      alert(planifError);
       if (e.code === "permission-denied") {
         $("portalBtn").hidden = false;
         setSync(`La planificación no deja leer con ${planifAuth.currentUser?.email || "esta cuenta"} (entra con tu Gmail de administrador)`);
@@ -209,6 +211,8 @@ async function loadPlanif() {
     });
   } catch (e) {
     console.error(e);
+    $("portalBtn").hidden = false;
+    planifError = "No se pudo cargar el acceso a la planificación: " + (e.code || e.message);
     setSync(planif ? "No se pudo actualizar la planificación (uso la última copia)" : "Error: no se pudo leer la planificación");
   }
 }
@@ -221,7 +225,7 @@ addEventListener("online", loadPlanif);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) loadPlanif(); });
 
 $("portalBtn").onclick = async () => {
-  try { await initPlanifAuth(); } catch { return alert("No se puede conectar ahora mismo. Prueba con conexión a internet."); }
+  try { await initPlanifAuth(); } catch (e) { return alert("No se puede conectar ahora mismo: " + (e.code || e.message)); }
   const prov = new planifAu.GoogleAuthProvider();
   prov.setCustomParameters({ prompt: "select_account" });
   try {
@@ -229,11 +233,13 @@ $("portalBtn").onclick = async () => {
     await planifAu.signInWithPopup(planifAuth, prov);
   } catch (e) {
     if (/popup-blocked|operation-not-supported/.test(e.code || "")) return planifAu.signInWithRedirect(planifAuth, prov);
-    if (!/popup-closed|cancelled-popup/.test(e.code || "")) alert("No se pudo entrar: " + (e.code || e.message));
+    if (e.code === "auth/unauthorized-domain") alert("Falta autorizar jmmonge4-hub.github.io en Firebase (padel-gestor → Authentication → Configuración → Dominios autorizados).");
+    else if (!/popup-closed|cancelled-popup/.test(e.code || "")) alert("No se pudo entrar: " + (e.code || e.message));
     return;
   }
   planifStop?.(); planifStop = null;
-  loadPlanif();
+  await loadPlanif();
+  if (planifStop) alert(`Conectado como ${planifAuth.currentUser.email}. Las guardias se actualizan solas.`);
 };
 
 // ---------- Pintado ----------
